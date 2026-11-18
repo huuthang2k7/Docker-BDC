@@ -1,0 +1,42 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment: # Biến môi trường cấu hình
+      ZOOKEEPER_CLIENT_PORT: 2181 # cổng để kafka kết nối HĐH
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on: # thứ tự khởi chạy, chạy zookeeper trước
+      - zookeeper
+    ports: # kết nối cổng máy thật (host) (bên trái) và cont (bên phải)
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 # Địa chỉ zookeeper (serive name instead IP)
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092 # Địa chỉ để worker kết nối
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -u producer.py
+    environment:
+      KAFKA_BROKER: ${KAFKA_BROKER}
+      TOPIC_NAME: ${TOPIC_NAME}
+    depends_on:
+      - kafka
+    
+  worker:
+    build: # Tự đóng gói image instead lấy cái có sẵn
+      context: . # Thư mục để đọc file (Thư mục hiện tại)
+      dockerfile: Dockerfile
+    command: python -u worker.py
+    environment:
+      KAFKA_BROKER: ${KAFKA_BROKER}
+      TOPIC_NAME: ${TOPIC_NAME}
+    restart: unless-stopped
+    volumes:
+      - ${RAW_DATA_PATH}:/app/data/raw #Bind mount, giữ dữ liệu khi xóa cont
+    depends_on:
+      - kafka # chạy kafka trước
