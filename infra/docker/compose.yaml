@@ -4,6 +4,7 @@ services:
     environment: # Biến môi trường cấu hình
       ZOOKEEPER_CLIENT_PORT: 2181 # cổng để kafka kết nối HĐH
 
+
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     depends_on: # thứ tự khởi chạy, chạy zookeeper trước
@@ -15,28 +16,48 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181 # Địa chỉ zookeeper (serive name instead IP)
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092 # Địa chỉ để worker kết nối
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
 
   producer:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python -u producer.py
+    command: ["python", "producer.py"]
+    restart: unless-stopped
     environment:
-      KAFKA_BROKER: ${KAFKA_BROKER}
-      TOPIC_NAME: ${TOPIC_NAME}
+      KAFKA_BROKER: ${KAFKA_BROKER:-kafka:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-events}
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     
   worker:
     build: # Tự đóng gói image instead lấy cái có sẵn
       context: . # Thư mục để đọc file (Thư mục hiện tại)
       dockerfile: Dockerfile
-    command: python -u worker.py
-    environment:
-      KAFKA_BROKER: ${KAFKA_BROKER}
-      TOPIC_NAME: ${TOPIC_NAME}
+    command: ["python", "worker.py"]
     restart: unless-stopped
+    environment:
+      KAFKA_BROKER: ${KAFKA_BROKER:-kafka:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-events}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-worker-group}
+      RAW_DATA_PATH: ${RAW_DATA_PATH:-/app/data/raw}
     volumes:
-      - ${RAW_DATA_PATH}:/app/data/raw #Bind mount, giữ dữ liệu khi xóa cont
+      - ./data:/app/data #Bind mount, giữ dữ liệu khi xóa cont
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, time; assert time.time() - os.path.getmtime('/tmp/worker_heartbeat') < 20"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 150s
     depends_on:
-      - kafka # chạy kafka trước
+      kafka: # chạy kafka trước
+        condition: service_healthy
+networks:
+  default:
+    name: kafka-lab-net

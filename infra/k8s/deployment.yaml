@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-worker
+  labels:
+    app: python-worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: python-worker
+  template:
+    metadata:
+      labels:
+        app: python-worker
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: docker-worker:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: worker-config
+            - secretRef:
+                name: worker-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          startupProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os; assert os.path.exists('/tmp/worker_heartbeat')"
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, time; assert time.time() - os.path.getmtime('/tmp/worker_heartbeat') < 20"
+            failureThreshold: 3
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os, time; assert time.time() - os.path.getmtime('/tmp/worker_heartbeat') < 15"
+            failureThreshold: 2
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: raw-data
+              mountPath: /app/data
+      volumes:
+        - name: raw-data
+          emptyDir: {}
+          
