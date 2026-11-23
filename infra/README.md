@@ -84,6 +84,8 @@ docker compose up -d --build
   docker compose logs --tail=10 producer worker
   (Get-Content data/raw/consumed_events.jsonl).Count
   ```
+* **Minh chứng:**
+  ![Test 1 - Check event_id](./image/test_0_done.png)
 
 #### Test 2: Graceful Shutdown (`SIGTERM`) & Tự phục hồi (`restart: unless-stopped`)
 * **Mục tiêu:** Kiểm chứng `worker` bắt tín hiệu `SIGTERM` để `fsync` + `commit()` offset và thoát êm trong ~1 giây (thay vì treo 10s chờ `SIGKILL`), sau đó tự động khởi động lại mà không mất/trùng dữ liệu.

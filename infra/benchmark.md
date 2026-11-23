@@ -9,7 +9,7 @@
 
 | Tiêu chí | Compose | K8s (k3d) |
 |---|---|---|
-| **Setup** | _điền số đo_ (`down` rồi đo `docker compose up -d`, có chờ Kafka healthy) | **≈39 s** = start cluster 19 s + import image 6 s + worker Ready ≤14 s (cluster đã tạo sẵn, chưa tính thời gian gõ lệnh) |
+| **Setup** | **≈5-6 s** (`down` rồi đo `docker compose up -d`, có chờ Kafka healthy) | **≈39 s** = start cluster 19 s + import image 6 s + worker Ready ≤14 s (cluster đã tạo sẵn) |
 | **RAM** | Kafka + ZK + producer = **517.6 MiB**; cộng worker (~15 MiB) ≈ **534 MiB** | Thêm node k3d + serverlb = 580.5 MiB (đã gồm Pod worker 15 MiB) → tổng ≈ **1099 MiB** (~2× Compose). |
 | **Độ phức tạp** | `compose.yaml` + Dockerfile + `.env` | Thêm 3 manifest (ConfigMap, Secret, Deployment) và 3 bước ngoài manifest: `docker network connect`, `k3d image import`, kiểm chứng endpoint |
 | **Self-healing** | Tiến trình tự thoát → `restart: unless-stopped` bật lại. `docker kill/stop` là dừng thủ công nên **không** tự bật lại. | Xóa Pod → ReplicaSet tạo Pod mới `1/1 Running`. `rollout restart` tạo ReplicaSet mới (`n6q6m` → `z85p4`) và Pod mới `1/1 Running`. |
